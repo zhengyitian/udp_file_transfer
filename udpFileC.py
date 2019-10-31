@@ -17,7 +17,7 @@ def calMd5(st):
     f.close()
     return m.hexdigest()     
 
-timeoutTime = 0.5
+timeoutTime = 0.55
 fileSize = 500*1024*1024
 serverIp = '155.138.174.74'
 #serverIp = '127.0.0.1'
@@ -54,7 +54,8 @@ class fileClient():
         self.f = open('b','wb')        
         self.gotNum = 0
         self.lostNum = 0
-        self.maxRec = 0        
+        self.maxRec = 0    
+        self.timeoutTime = timeoutTime
         self.minRec = timeoutTime     
         self.readyList = deque()
         self.workingMap = {}
@@ -187,7 +188,7 @@ def deal_rec(l):
 def deal_timeout():
     for sock in list(sockMap.keys()):
         v = sockMap[sock]
-        if v['createTime']+timeoutTime<getRunningTime():
+        if v['createTime']+gFile.timeoutTime<getRunningTime():
             newData(sock,True)
             
 staTime = getRunningTime()  
@@ -196,13 +197,15 @@ startTime = getRunningTime()
 
 while True:  
     if not startSign:
-        r = select.select(sockMap.keys(),[],[],timeoutTime)  
+        r = select.select(sockMap.keys(),[],[],gFile.timeoutTime)  
     else:
         startSign.append(1)
     deal_rec(r[0])      
     deal_timeout()    
     if getRunningTime()-staTime>1:
         staTime = getRunningTime()
+        if gFile.maxRec>0:
+            gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)
         ss = '%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.maxRec,gFile.minRec,\
                                          gFile.recNum,gFile.packNum,gFile.recNum*1.0/gFile.packNum,\
                                          int((gFile.packNum-gFile.recNum)/(gFile.gotNum+1)))
