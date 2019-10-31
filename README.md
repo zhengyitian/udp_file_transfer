@@ -6,6 +6,6 @@ on the server, name the file "a",run udpFileS.py
 
 copy the file size to udpFileC.py on the client
 
-run udpFileC.py on the client, the file's is "b"
+run udpFileC.py on the client, the file's name is "b"
 
 when finished, compare the md5
