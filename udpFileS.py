@@ -1,9 +1,6 @@
 import socket,select,platform
 import os,json,hashlib,binascii
 platformName = platform.system()
-
-salt = b'salt'
-
 def calMd5(st):    
     co = 0
     m = hashlib.md5()
@@ -15,7 +12,20 @@ def calMd5(st):
         co += len(s)
         m.update(s)             
     f.close()
-    return m.hexdigest()     
+    return m.hexdigest()    
+
+salt = b'salt'
+cacheSize = 1024*1024*60
+st = os.stat('a')
+print(st.st_size)
+md5 = calMd5('a')
+print ('md5 : '+md5)
+bigNum = 20500
+if platformName=='Linux':
+    bigNum = 20700
+listenPort = list(range(20000,bigNum))
+sockMap = {}
+ 
 
 def checkPackValid_server(s,salt):
     if len(s)<4:
@@ -36,16 +46,7 @@ def makePack_server(s,u,salt):
     s2 = s1+dk
     return s2
 
-cacheSize = 1024*1024*30
-st = os.stat('a')
-print(st.st_size)
-md5 = calMd5('a')
-print ('md5 : '+md5)
-bigNum = 20500
-if platformName=='Linux':
-    bigNum = 20700
-listenPort = list(range(20000,bigNum))
-sockMap = {}
+
 for i in listenPort:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('0.0.0.0',i))
