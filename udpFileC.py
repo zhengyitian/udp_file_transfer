@@ -1,55 +1,66 @@
-import socket,select,uuid
+import socket,select
 import json,binascii,hashlib
 import time,os,sys,platform
 from collections import deque
 import random
+platformName = platform.system()
+pyV = sys.version_info[0]
+def getRunningTime():    
+    if pyV == 3:
+        return time.monotonic()
+    if platformName=='Windows':
+        return time.clock()
+    elif platformName=='Linux':
+        with open('/proc/uptime') as f:
+            return float(f.read().split()[0])
+    else:
+        return time.time()
+    
 
 def calMd5(st):    
-    co = 0
     m = hashlib.md5()
     f = open(st,'rb')
     while True:
         s = f.read(10*1024*1024)
         if len(s) == 0:
             break
-        co += len(s)
         m.update(s)             
     f.close()
     return m.hexdigest()     
+
+def makePack(s,salt):
+    u = gFile.getuuid()
+    u2 = binascii.unhexlify(u)
+    s1 = u2+s
+    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 1)[-4:]
+    s2 = s1+dk
+    return u,s2
+
+def checkPackValid(s,u,salt):
+    if len(s)<4:
+        return b'',False
+    s1 = s[-4:]
+    s2 = s[:-4]
+    uuid = binascii.unhexlify(u)
+    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 1)[-4:]
+    if dk != s1:
+        return b'',False
+    if s2[:4] != uuid:
+        return b'',False
+    return s2[4:],True
 
 timeoutTime = 0.55
 fileSize = 500*1024*1024
 serverIp = '155.138.174.74'
 #serverIp = '127.0.0.1'
-portList = list(range(20000,20500))
+portNum = 20500
+bigNum = 20700
+packSize = 8000
 salt = b'salt'
-
-def makePack(s,salt):
-    u = str(uuid.uuid1())
-    u = u.replace('-','')
-    u2 = binascii.unhexlify(u)
-    s1 = u2+s
-    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 2)
-    s2 = s1+dk
-    return u,s2
-
-def checkPackValid(s,u,salt):
-    if len(s)<16:
-        return b'',False
-    s1 = s[-16:]
-    s2 = s[:-16]
-    uuid = binascii.unhexlify(u)
-    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 2)
-    if dk != s1:
-        return b'',False
-    if s2[:16] != uuid:
-        return b'',False
-    return s2[16:],True
-
 class fileClient():
     def __init__(self):
         self.fileSize = fileSize
-        self.packSize = 1450
+        self.packSize = packSize
         self.packNum = int(self.fileSize/self.packSize)+1
         self.f = open('b','wb')        
         self.gotNum = 0
@@ -65,10 +76,16 @@ class fileClient():
         self.finishMap = {}
         self.writeCache = []
         self.nextPack = 0
+        self.uuid = 0
+        
+    def getuuid(self):
+        self.uuid += 1
+        h = hex(self.uuid)[2:]
+        return '0'*(8-len(h))+h
 
     def get(self): 
         end = self.packSize*self.recNum      
-        fileId = str(uuid.uuid1())
+        fileId = self.getuuid()
         if self.readyList:
             num = self.readyList.popleft()
             self.workingSet.add(num)
@@ -133,29 +150,21 @@ class fileClient():
         self.maxRec = 0        
         self.minRec = timeoutTime             
         
-gFile = fileClient()    
+gFile = fileClient()   
 sockMap = {}
-platformName = platform.system()
-pyV = sys.version_info[0]
-def getRunningTime():    
-    if pyV == 3:
-        return time.monotonic()
-    if platformName=='Windows':
-        return time.clock()
-    elif platformName=='Linux':
-        with open('/proc/uptime') as f:
-            return float(f.read().split()[0])
-    else:
-        return time.time()
-    
+portList = list(range(20000,portNum))
+cacheList = deque(range(portNum,bigNum))
+
 for i in portList:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
-    sockMap[sock] = {'num':i,'createTime':getRunningTime()-2*timeoutTime,'fileId':str(uuid.uuid1())}  
+    sockMap[sock] = {'num':i,'createTime':getRunningTime()-2*timeoutTime,'fileId':gFile.getuuid()}  
 
 def newData(sock,newSock=False):  
     num = sockMap[sock]['num']
     fileId = sockMap[sock]['fileId']
     if newSock:    
+        cacheList.append(num)
+        num = cacheList.popleft()
         sock.close()
         gFile.lost(fileId)
         del sockMap[sock]
@@ -186,10 +195,13 @@ def deal_rec(l):
         newData(sock)
         
 def deal_timeout():
+    hasOut = False
     for sock in list(sockMap.keys()):
         v = sockMap[sock]
         if v['createTime']+gFile.timeoutTime<getRunningTime():
             newData(sock,True)
+            hasOut = True
+    return hasOut
             
 staTime = getRunningTime()  
 startSign = []
@@ -197,15 +209,17 @@ startTime = getRunningTime()
 
 while True:  
     if not startSign:
-        r = select.select(sockMap.keys(),[],[],gFile.timeoutTime)  
+        r = select.select(sockMap.keys(),[],[],0.01)  
     else:
         startSign.append(1)
     deal_rec(r[0])      
-    deal_timeout()    
+    hasOut = deal_timeout()  
+    if not hasOut and not r[0]:
+        print (getRunningTime(),'blank')
     if getRunningTime()-staTime>1:
         staTime = getRunningTime()
         if gFile.maxRec>0:
-            gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)
+            gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)            
         ss = '%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.maxRec,gFile.minRec,\
                                          gFile.recNum,gFile.packNum,gFile.recNum*1.0/gFile.packNum,\
                                          int((gFile.packNum-gFile.recNum)/(gFile.gotNum+1)))

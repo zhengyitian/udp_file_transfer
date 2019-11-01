@@ -1,5 +1,8 @@
-import socket,select,uuid
+import socket,select,platform
 import os,json,hashlib,binascii
+platformName = platform.system()
+
+salt = b'salt'
 
 def calMd5(st):    
     co = 0
@@ -15,31 +18,33 @@ def calMd5(st):
     return m.hexdigest()     
 
 def checkPackValid_server(s,salt):
-    if len(s)<16:
+    if len(s)<4:
         return '',b''
-    s1 = s[-16:]
-    s2 = s[:-16]
-    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 2)
+    s1 = s[-4:]
+    s2 = s[:-4]
+    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 1)[-4:]
     if dk != s1:
         return '',b''
-    if len(s2)<16:
+    if len(s2)<4:
         return '',b''
-    return (binascii.hexlify(s2[:16])).decode() ,s2[16:]
+    return (binascii.hexlify(s2[:4])).decode() ,s2[4:]
 
 def makePack_server(s,u,salt):
     u2 = binascii.unhexlify(u)
     s1 = u2+s
-    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 2)
+    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 1)[-4:]
     s2 = s1+dk
     return s2
 
-salt = b'salt'
 cacheSize = 1024*1024*30
 st = os.stat('a')
 print(st.st_size)
 md5 = calMd5('a')
 print ('md5 : '+md5)
-listenPort = list(range(20000,20500))
+bigNum = 20500
+if platformName=='Linux':
+    bigNum = 20700
+listenPort = list(range(20000,bigNum))
 sockMap = {}
 for i in listenPort:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -84,7 +89,7 @@ def deal_rec(l):
         m = json.loads(ss)
         j = gFile.get(m['pos'],m['len'])
         gFile.refresh(m['end'])
-        data = makePack_server(j, uuid, salt)
+        data = makePack_server(j, uuid,salt)
         one.sendto(data,addr)
       
 while True:    
