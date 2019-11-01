@@ -5,12 +5,12 @@ from collections import deque
 import random
 
 timeoutTime = 0.55
-fileSize = 500*1024*1024
+fileSize = 100*1024*1024
 serverIp = '155.138.174.74'
 #serverIp = '127.0.0.1'
-portNum = 20500
-bigNum = 20500
-packSize = 6000
+portNum = 20300
+bigNum = 20700
+packSize = 900
 salt = b'salt'
 
 platformName = platform.system()
@@ -63,10 +63,15 @@ def checkPackValid(s,u,salt):
 
 class fileClient():
     def __init__(self):
+        self.base = 0
         self.fileSize = fileSize
+        if os.path.exists('b'):
+            st = os.stat('b')
+            self.fileSize = fileSize-st.st_size
+            self.base = st.st_size
         self.packSize = packSize
         self.packNum = int(self.fileSize/self.packSize)+1
-        self.f = open('b','wb')        
+        self.f = open('b','ab')        
         self.gotNum = 0
         self.lostNum = 0
         self.maxRec = 0    
@@ -94,20 +99,20 @@ class fileClient():
             num = self.readyList.popleft()
             self.workingSet.add(num)
             self.workingMap[fileId] = num
-            return fileId,end,num*self.packSize,self.packSize
+            return fileId,end+self.base,num*self.packSize+self.base,self.packSize
         
         if self.nextPack > self.packNum:
             if self.workingSet:
                 maxNum = random.randint(min(self.workingSet),max(self.workingSet)) 
             else:
-                return fileId,end,0,0
+                return fileId,end+self.base,self.base,0
         else:
             maxNum = self.nextPack
             self.nextPack += 1
             
         self.workingSet.add(maxNum)
         self.workingMap[fileId] = maxNum
-        return fileId,end,maxNum*self.packSize,self.packSize                  
+        return fileId,end+self.base,maxNum*self.packSize+self.base,self.packSize                  
     
     def push(self,id,data):
         self.gotNum += 1     
@@ -137,7 +142,12 @@ class fileClient():
                 md5 = calMd5('b')
                 print ('md5 : '+md5)
                 sys.exit(0)
-    
+    def close(self):
+        self.f.write(b''.join(self.writeCache))
+        self.f.close()
+        md5 = calMd5('b')
+        print ('md5 : '+md5)
+        sys.exit(0)        
     def lost(self,id):
         self.lostNum += 1      
         if id not in self.workingMap:
@@ -208,26 +218,33 @@ def deal_timeout():
             hasOut = True
     return hasOut
             
-staTime = getRunningTime()  
-startSign = []
-startTime = getRunningTime()
 
-while True:  
-    if not startSign:
-        r = select.select(sockMap.keys(),[],[],0.01)  
-    else:
-        startSign.append(1)
-    deal_rec(r[0])      
-    hasOut = deal_timeout()  
-    if not hasOut and not r[0]:
-        print (getRunningTime(),'blank')
-    if getRunningTime()-staTime>1:
-        staTime = getRunningTime()
-        if gFile.maxRec>0:
-            gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)            
-        ss = '%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.maxRec,gFile.minRec,\
-                                         gFile.recNum,gFile.packNum,gFile.recNum*1.0/gFile.packNum,\
-                                         int((gFile.packNum-gFile.recNum)/(gFile.gotNum+1)))
-        s2 = ' ## %s,%s'%(len(gFile.workingMap),len(gFile.finishMap))        
-        print(int(getRunningTime()-startTime),ss+s2)
-        gFile.clearStat()
+def main():
+    staTime = getRunningTime()  
+    startSign = []
+    startTime = getRunningTime()    
+    while True:  
+        if not startSign:
+            r = select.select(sockMap.keys(),[],[],0.01)  
+        else:
+            startSign.append(1)
+        deal_rec(r[0])      
+        hasOut = deal_timeout()  
+        #if not hasOut and not r[0]:
+            #print (getRunningTime(),'blank')
+        if getRunningTime()-staTime>1:
+            staTime = getRunningTime()
+            if gFile.maxRec>0:
+                gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)            
+            ss = '%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.maxRec,gFile.minRec,\
+                                             gFile.recNum,gFile.packNum,gFile.recNum*1.0/gFile.packNum,\
+                                             int((gFile.packNum-gFile.recNum)/(gFile.gotNum+1)))
+            s2 = ' ## %s,%s'%(len(gFile.workingMap),len(gFile.finishMap))        
+            print(int(getRunningTime()-startTime),ss+s2)
+            gFile.clearStat()
+try:
+    main()
+except KeyboardInterrupt:
+    gFile.close()
+    
+    
