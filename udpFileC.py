@@ -1,5 +1,5 @@
 import socket,select
-import json,binascii,hashlib
+import struct,binascii,hashlib
 import time,os,sys,platform
 from collections import deque
 import random
@@ -7,10 +7,10 @@ import random
 timeoutTime = 0.55
 fileSize = 500*1024*1024
 serverIp = '155.138.174.74'
-serverIp = '127.0.0.1'
+#serverIp = '127.0.0.1'
 portNum = 20500
 bigNum = 20500
-packSize = 8000
+packSize = 6000
 salt = b'salt'
 
 platformName = platform.system()
@@ -175,16 +175,17 @@ def newData(sock,newSock=False):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     fileId,end,pos,len = gFile.get()
-    m = {'end':end,'pos':pos,'len':len}
-    j = json.dumps(m)
-    j = j.encode()
+    j = b''
+    j += struct.pack('q',end)
+    j += struct.pack('q',pos)
+    j += struct.pack('q',len)   
     u ,s2 = makePack(j,salt)    
     sock.sendto(s2, (serverIp, num))    
     sockMap[sock] = {'num':num,'createTime':getRunningTime(),'uuid':u,'fileId':fileId}
 
 def deal_rec(l):
     for sock in l:
-        j = sock.recv(10000)
+        j = sock.recv(100000)
         u = sockMap[sock]['uuid']
         s2,sign = checkPackValid(j,u,salt)
         if not sign:

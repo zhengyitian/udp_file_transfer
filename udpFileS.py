@@ -1,5 +1,5 @@
 import socket,select,platform
-import os,json,hashlib,binascii
+import os,struct,hashlib,binascii
 platformName = platform.system()
 def calMd5(st):    
     co = 0
@@ -83,13 +83,15 @@ def deal_rec(l):
     re = []
     reSocks = []
     for one in l:
-        data, addr = one.recvfrom(10000)
+        data, addr = one.recvfrom(100000)
         uuid ,ss = checkPackValid_server(data,salt)
         if not uuid :
             continue         
-        m = json.loads(ss)
-        j = gFile.get(m['pos'],m['len'])
-        gFile.refresh(m['end'])
+        end = struct.unpack('q',ss[:8])[0]
+        pos = struct.unpack('q',ss[8:16])[0]
+        len = struct.unpack('q',ss[16:24])[0]
+        j = gFile.get(pos,len)
+        gFile.refresh(end)
         data = makePack_server(j, uuid,salt)
         one.sendto(data,addr)
       
