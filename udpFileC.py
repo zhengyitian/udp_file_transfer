@@ -3,8 +3,19 @@ import json,binascii,hashlib
 import time,os,sys,platform
 from collections import deque
 import random
+
+timeoutTime = 0.55
+fileSize = 500*1024*1024
+serverIp = '155.138.174.74'
+serverIp = '127.0.0.1'
+portNum = 20500
+bigNum = 20500
+packSize = 8000
+salt = b'salt'
+
 platformName = platform.system()
 pyV = sys.version_info[0]
+
 def getRunningTime():    
     if pyV == 3:
         return time.monotonic()
@@ -32,7 +43,7 @@ def makePack(s,salt):
     u = gFile.getuuid()
     u2 = binascii.unhexlify(u)
     s1 = u2+s
-    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 1)[-4:]
+    dk = salt[-4:]
     s2 = s1+dk
     return u,s2
 
@@ -42,21 +53,14 @@ def checkPackValid(s,u,salt):
     s1 = s[-4:]
     s2 = s[:-4]
     uuid = binascii.unhexlify(u)
-    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 1)[-4:]
+    dk = salt[-4:]
     if dk != s1:
         return b'',False
     if s2[:4] != uuid:
         return b'',False
     return s2[4:],True
 
-timeoutTime = 0.55
-fileSize = 500*1024*1024
-serverIp = '155.138.174.74'
-#serverIp = '127.0.0.1'
-portNum = 20500
-bigNum = 20700
-packSize = 8000
-salt = b'salt'
+
 class fileClient():
     def __init__(self):
         self.fileSize = fileSize

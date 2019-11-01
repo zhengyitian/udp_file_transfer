@@ -22,7 +22,7 @@ def checkPackValid_server(s,salt):
         return '',b''
     s1 = s[-4:]
     s2 = s[:-4]
-    dk = hashlib.pbkdf2_hmac('md5', s2, salt, 1)[-4:]
+    dk = salt[-4:]
     if dk != s1:
         return '',b''
     if len(s2)<4:
@@ -32,7 +32,7 @@ def checkPackValid_server(s,salt):
 def makePack_server(s,u,salt):
     u2 = binascii.unhexlify(u)
     s1 = u2+s
-    dk = hashlib.pbkdf2_hmac('md5', s1, salt, 1)[-4:]
+    dk = salt[-4:]
     s2 = s1+dk
     return s2
 
