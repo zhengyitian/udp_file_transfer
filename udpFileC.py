@@ -8,20 +8,21 @@ timeoutTime = 0.55
 fileSize = 100*1024*1024
 serverIp = '155.138.174.74'
 #serverIp = '127.0.0.1'
-portNum = 20300
+baseNum = 20000
+portNum = 20500
 bigNum = 20700
-packSize = 900
+packSize = 1400
 salt = b'salt'
 
 platformName = platform.system()
 pyV = sys.version_info[0]
 
 def getRunningTime():    
-    if pyV == 3:
-        return time.monotonic()
     if platformName=='Windows':
         return time.clock()
-    elif platformName=='Linux':
+    if pyV == 3:
+        return time.monotonic()    
+    if platformName=='Linux':
         with open('/proc/uptime') as f:
             return float(f.read().split()[0])
     else:
@@ -86,7 +87,8 @@ class fileClient():
         self.writeCache = []
         self.nextPack = 0
         self.uuid = 0
-        
+        self.timeoutList = []
+
     def getuuid(self):
         self.uuid += 1
         h = hex(self.uuid)[2:]
@@ -168,16 +170,20 @@ gFile = fileClient()
 sockMap = {}
 portList = list(range(20000,portNum))
 cacheList = deque(range(portNum,bigNum))
-
+for i in range(20000,bigNum):
+    gFile.timeoutList.append(float('inf'))
+    
 for i in portList:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) 
     sockMap[sock] = {'num':i,'createTime':getRunningTime()-2*timeoutTime,'fileId':gFile.getuuid()}  
+    
 
 def newData(sock,newSock=False):  
     num = sockMap[sock]['num']
     fileId = sockMap[sock]['fileId']
     if newSock:    
         cacheList.append(num)
+        gFile.timeoutList[num-baseNum] = float('inf')
         num = cacheList.popleft()
         sock.close()
         gFile.lost(fileId)
@@ -192,6 +198,7 @@ def newData(sock,newSock=False):
     u ,s2 = makePack(j,salt)    
     sock.sendto(s2, (serverIp, num))    
     sockMap[sock] = {'num':num,'createTime':getRunningTime(),'uuid':u,'fileId':fileId}
+    gFile.timeoutList[num-baseNum] = getRunningTime()
 
 def deal_rec(l):
     for sock in l:
@@ -223,14 +230,31 @@ def main():
     staTime = getRunningTime()  
     startSign = []
     startTime = getRunningTime()    
+    
     while True:  
-        if not startSign:
+        j =oriTime=overTime= 0
+        if  startSign:
+            tempM = min(gFile.timeoutList)
+            wt = gFile.timeoutTime+tempM-getRunningTime()
+            #for i in range(baseNum,bigNum):
+                #if gFile.timeoutList[i-baseNum]==tempM:
+                    #j = i
+          #  print('wt',wt)
+            wt = max(0,wt)
+            #oriTime = getRunningTime()
             r = select.select(sockMap.keys(),[],[],0.01)  
+            #overTime = getRunningTime()
         else:
             startSign.append(1)
+            r = [[],]
         deal_rec(r[0])      
         hasOut = deal_timeout()  
         #if not hasOut and not r[0]:
+            #for sock in list(sockMap.keys()):
+                #v = sockMap[sock]
+                #if v['num']==j:
+                    #print (v,getRunningTime(),gFile.timeoutTime,wt,oriTime,overTime)
+                            
             #print (getRunningTime(),'blank')
         if getRunningTime()-staTime>1:
             staTime = getRunningTime()
