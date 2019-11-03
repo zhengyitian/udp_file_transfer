@@ -1,6 +1,20 @@
-import socket,select,platform
+import socket,select,platform,sys,platform
 import os,struct,hashlib,binascii
 platformName = platform.system()
+import time
+platformName = platform.system()
+pyV = sys.version_info[0]
+def getRunningTime():    
+    if pyV == 3:
+        return time.monotonic()
+    if platformName=='Windows':
+        return time.clock()
+    elif platformName=='Linux':
+        with open('/proc/uptime') as f:
+            return float(f.read().split()[0])
+    else:
+        return time.time()
+
 def calMd5(st):    
     co = 0
     m = hashlib.md5()
@@ -58,6 +72,8 @@ class fileWrapper():
         self.readCache = self.f.read(cacheSize)
         self.beginPos = 0
         self.co = 0
+        self.staTime = getRunningTime()
+        self.packRec = 0
 
     def refresh(self,end):
         if end<0:
@@ -86,7 +102,8 @@ def deal_rec(l):
         data, addr = one.recvfrom(100000)
         uuid ,ss = checkPackValid_server(data,salt)
         if not uuid :
-            continue         
+            continue  
+        gFile.packRec += 1
         end = struct.unpack('q',ss[:8])[0]
         pos = struct.unpack('q',ss[8:16])[0]
         len = struct.unpack('q',ss[16:24])[0]
@@ -98,3 +115,8 @@ def deal_rec(l):
 while True:    
     r = select.select(sockMap.keys(),[],[],1)
     deal_rec(r[0])
+    if getRunningTime()-gFile.staTime>1:
+        gFile.staTime = getRunningTime()
+        print(getRunningTime(),gFile.packRec)
+        gFile.packRec = 0
+        
