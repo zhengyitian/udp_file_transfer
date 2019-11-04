@@ -36,7 +36,7 @@ md5 = calMd5('a')
 print ('md5 : '+md5)
 bigNum = 20500
 if platformName=='Linux':
-    bigNum = 20700
+    bigNum = 21000
 listenPort = list(range(20000,bigNum))
 sockMap = {}
  
