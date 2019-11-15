@@ -10,8 +10,8 @@ serverIp = '155.138.174.74'
 #serverIp = '127.0.0.1'
 baseNum = 20000
 portNum = 20500
-bigNum = 20700
-packSize = 1400
+bigNum = 21000
+packSize = 2000
 salt = b'salt'
 
 platformName = platform.system()
@@ -90,11 +90,13 @@ class fileClient():
         self.timeoutList = []
 
     def getuuid(self):
+        #return '0'*8
         self.uuid += 1
-        h = hex(self.uuid)[2:]
+        h = hex(self.uuid)[2:]        
         return '0'*(8-len(h))+h
 
     def get(self): 
+        #return '0'*8,0,0,1400
         end = self.packSize*self.recNum      
         fileId = self.getuuid()
         if self.readyList:

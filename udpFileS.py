@@ -117,6 +117,5 @@ while True:
     deal_rec(r[0])
     if getRunningTime()-gFile.staTime>1:
         gFile.staTime = getRunningTime()
-        print(getRunningTime(),gFile.packRec)
         gFile.packRec = 0
         
