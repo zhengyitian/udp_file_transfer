@@ -5,13 +5,13 @@ from collections import deque
 import random
 
 timeoutTime = 0.55
-fileSize = 100*1024*1024
+fileSize = 594280448
 serverIp = '155.138.174.74'
-#serverIp = '127.0.0.1'
+
 baseNum = 20000
 portNum = 20500
 bigNum = 21000
-packSize = 2000
+packSize = 6000
 salt = b'salt'
 
 platformName = platform.system()
@@ -90,13 +90,11 @@ class fileClient():
         self.timeoutList = []
 
     def getuuid(self):
-        #return '0'*8
         self.uuid += 1
         h = hex(self.uuid)[2:]        
         return '0'*(8-len(h))+h
 
     def get(self): 
-        #return '0'*8,0,0,1400
         end = self.packSize*self.recNum      
         fileId = self.getuuid()
         if self.readyList:
@@ -238,26 +236,16 @@ def main():
         if  startSign:
             tempM = min(gFile.timeoutList)
             wt = gFile.timeoutTime+tempM-getRunningTime()
-            #for i in range(baseNum,bigNum):
-                #if gFile.timeoutList[i-baseNum]==tempM:
-                    #j = i
-          #  print('wt',wt)
+            for i in range(baseNum,bigNum):
+                if gFile.timeoutList[i-baseNum]==tempM:
+                    j = i
             wt = max(0,wt)
-            #oriTime = getRunningTime()
-            r = select.select(sockMap.keys(),[],[],0.01)  
-            #overTime = getRunningTime()
+            r = select.select(sockMap.keys(),[],[],wt)  
         else:
             startSign.append(1)
             r = [[],]
         deal_rec(r[0])      
         hasOut = deal_timeout()  
-        #if not hasOut and not r[0]:
-            #for sock in list(sockMap.keys()):
-                #v = sockMap[sock]
-                #if v['num']==j:
-                    #print (v,getRunningTime(),gFile.timeoutTime,wt,oriTime,overTime)
-                            
-            #print (getRunningTime(),'blank')
         if getRunningTime()-staTime>1:
             staTime = getRunningTime()
             if gFile.maxRec>0:
