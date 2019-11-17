@@ -5,18 +5,19 @@ from collections import deque
 import random
 
 timeoutTime = 0.55
-fileSize = 594280448
-serverIp = '155.138.174.74'
+fileSize = 4719551306
+serverIp = ['155.138.174.74',]
 
 baseNum = 20000
-portNum = 20500
+portNum = 20700
 bigNum = 21000
-packSize = 6000
+packSize = 1400
 salt = b'salt'
-
+gotNumThr  = 100
+selIpLen = 10
 platformName = platform.system()
 pyV = sys.version_info[0]
-
+maxNewPack  = 300
 def getRunningTime():    
     if platformName=='Windows':
         return time.clock()
@@ -88,6 +89,9 @@ class fileClient():
         self.nextPack = 0
         self.uuid = 0
         self.timeoutList = []
+        self.newPack = 0
+        self.ipSel = 1
+        self.ipSelCo = 0
 
     def getuuid(self):
         self.uuid += 1
@@ -164,7 +168,9 @@ class fileClient():
     def clearStat(self):
         self.lostNum=self.gotNum = 0
         self.maxRec = 0        
-        self.minRec = timeoutTime             
+        self.minRec = timeoutTime   
+        self.newPack = 0
+        self.ipSelCo -= 1
         
 gFile = fileClient()   
 sockMap = {}
@@ -190,13 +196,20 @@ def newData(sock,newSock=False):
         del sockMap[sock]
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    fileId,end,pos,len = gFile.get()
+    fileId,end,pos,leng = gFile.get()
     j = b''
     j += struct.pack('q',end)
     j += struct.pack('q',pos)
-    j += struct.pack('q',len)   
+    j += struct.pack('q',leng)   
     u ,s2 = makePack(j,salt)    
-    sock.sendto(s2, (serverIp, num))    
+    ll = len(serverIp)
+    sip = serverIp[gFile.ipSel%ll]
+    if newSock and gFile.newPack<maxNewPack:
+        sock.sendto(s2, (sip, num))   
+        gFile.newPack += 1
+    if not newSock:
+        sock.sendto(s2, (sip, num))   
+        
     sockMap[sock] = {'num':num,'createTime':getRunningTime(),'uuid':u,'fileId':fileId}
     gFile.timeoutList[num-baseNum] = getRunningTime()
 
@@ -247,15 +260,20 @@ def main():
         deal_rec(r[0])      
         hasOut = deal_timeout()  
         if getRunningTime()-staTime>1:
+            if gFile.gotNum <gotNumThr and gFile.ipSelCo<0:
+                gFile.ipSel += 1
+                gFile.ipSelCo = selIpLen
+                print ('ip changed')
             staTime = getRunningTime()
             if gFile.maxRec>0:
                 gFile.timeoutTime = min(gFile.maxRec+0.1,timeoutTime)            
-            ss = '%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.maxRec,gFile.minRec,\
+            ss = '%s,%s,%s,%2.3f ,%2.3f,%s/%s,%2.3f,%s'%(gFile.gotNum,gFile.lostNum,gFile.newPack,gFile.maxRec,gFile.minRec,\
                                              gFile.recNum,gFile.packNum,gFile.recNum*1.0/gFile.packNum,\
                                              int((gFile.packNum-gFile.recNum)/(gFile.gotNum+1)))
             s2 = ' ## %s,%s'%(len(gFile.workingMap),len(gFile.finishMap))        
             print(int(getRunningTime()-startTime),ss+s2)
             gFile.clearStat()
+            
 try:
     main()
 except KeyboardInterrupt:
